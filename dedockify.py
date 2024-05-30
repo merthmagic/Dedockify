@@ -2,6 +2,7 @@
 
 from sys import argv
 import docker
+import docker.errors
 
 class ImageNotFound(Exception):
     pass
@@ -11,9 +12,9 @@ class MainObj:
     def __init__(self):
         super(MainObj, self).__init__()
         self.commands = []
-        self.cli = docker.APIClient(base_url='unix://var/run/docker.sock')
+        self.cli = docker.client.from_env()
         self._get_image(argv[-1])
-        self.hist = self.cli.history(self.img['RepoTags'][0])
+        self.hist = self.img.history()
         self._parse_history()
         self.commands.reverse()
         self._print_commands()
@@ -23,12 +24,12 @@ class MainObj:
             print(i)
 
     def _get_image(self, img_hash):
-        images = self.cli.images()
-        for i in images:
-            if img_hash in i['Id']:
-                self.img = i
-                return
-        raise ImageNotFound("Image {} not found\n".format(img_hash))
+        try:
+            img = self.cli.images.get(img_hash)
+            self.img = img
+        except docker.errors.ImageNotFound:
+            raise ImageNotFound("Image {} not found".format(img_hash))
+        
 
     def _insert_step(self, step):
         if "#(nop)" in step:
